@@ -1,7 +1,7 @@
 //#!/usr/bin/env node
 
 var program = require('commander');
-var Port = require('../../Port');
+var Port = require('port-socket');
 var path = require('path');
 var fs = require('fs');
 var os = require('os');
