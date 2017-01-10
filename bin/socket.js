@@ -11,24 +11,25 @@ var StatsD = require('node-statsd');
 var Docker = require('dockerode');
 var io = require('socket.io-client');
 var debug = require('debug')('Port-api');
+var ip = require('ip');
 
 program.version(require('../package.json').version);
 
 program.description('View logs in teal-time.');
 
 program.option('-u, --url [HOST]', 'HOST (default: http://127.0.0.1:8000)', 'http://127.0.0.1:8000');
-program.option('-r, --region [REGION]', 'Region located in (us)', 'us');
+program.option('-z, --zone [REGION]', 'Zone located in (far1)', 'far1');
 program.option('-t, --token [TOKEN]', 'Token auth');
 program.option('-e, --environment [ENVIROMENT]', 'environment to use (services)', 'services');
 program.option('-n, --name [NAME]', 'name to use (port)', 'test');
+program.option('-i, --id [ID]', 'id to use (port)', 'test');
 program.option('-m, --multi-tenant [MULTITENANT]', 'multiTenant (default: true)', true);
 program.option('-s, --stats [STATS]', false);
-program.option('-a, --address [ADDRESS]', '127.0.0.1');
+program.option('-a, --address [ADDRESS]', ip.address());
 program.option('-b, --stats-host [HOST]', '127.0.0.1');
 program.option('-c, --stats-port [PORT]', 8125);
-
 program.parse(process.argv);
-
+program.address = program.address || ip.address();
 var wait = [];
 
 if (program.stats) {
@@ -40,8 +41,9 @@ if (program.stats) {
 
 var port = new Port({
 	name : program.name,
+	address : program.address,
 	environment : program.environment,
-	maxMemory : 2222222,
+	maxMemory : os.totalmem() / Math.pow(1024, 2),
 	multiTenant : program.multiTenant,
 	docker : {
 		socket : '/var/run/docker.sock',
@@ -52,100 +54,19 @@ var port = new Port({
 port.on('error', function(err) {
 	console.log(err);
 });
-a = {
-	"read" : "2015-01-08T22:57:31.547920715Z",
-	"networks" : {
-		"eth0" : {
-			"rx_bytes" : 5338,
-			"rx_dropped" : 0,
-			"rx_errors" : 0,
-			"rx_packets" : 36,
-			"tx_bytes" : 648,
-			"tx_dropped" : 0,
-			"tx_errors" : 0,
-			"tx_packets" : 8
-		},
-		"eth5" : {
-			"rx_bytes" : 4641,
-			"rx_dropped" : 0,
-			"rx_errors" : 0,
-			"rx_packets" : 26,
-			"tx_bytes" : 690,
-			"tx_dropped" : 0,
-			"tx_errors" : 0,
-			"tx_packets" : 9
-		}
-	},
-	"memory_stats" : {
-		"stats" : {
-			"total_pgmajfault" : 0,
-			"cache" : 0,
-			"mapped_file" : 0,
-			"total_inactive_file" : 0,
-			"pgpgout" : 414,
-			"rss" : 6537216,
-			"total_mapped_file" : 0,
-			"writeback" : 0,
-			"unevictable" : 0,
-			"pgpgin" : 477,
-			"total_unevictable" : 0,
-			"pgmajfault" : 0,
-			"total_rss" : 6537216,
-			"total_rss_huge" : 6291456,
-			"total_writeback" : 0,
-			"total_inactive_anon" : 0,
-			"rss_huge" : 6291456,
-			"hierarchical_memory_limit" : 67108864,
-			"total_pgfault" : 964,
-			"total_active_file" : 0,
-			"active_anon" : 6537216,
-			"total_active_anon" : 6537216,
-			"total_pgpgout" : 414,
-			"total_cache" : 0,
-			"inactive_anon" : 0,
-			"active_file" : 0,
-			"pgfault" : 964,
-			"inactive_file" : 0,
-			"total_pgpgin" : 477
-		},
-		"max_usage" : 6651904,
-		"usage" : 6537216,
-		"failcnt" : 0,
-		"limit" : 67108864
-	},
-	"blkio_stats" : {},
-	"cpu_stats" : {
-		"cpu_usage" : {
-			"percpu_usage" : [8646879, 24472255, 36438778, 30657443],
-			"usage_in_usermode" : 50000000,
-			"total_usage" : 100215355,
-			"usage_in_kernelmode" : 30000000
-		},
-		"system_cpu_usage" : 739306590000000,
-		"throttling_data" : {
-			"periods" : 0,
-			"throttled_periods" : 0,
-			"throttled_time" : 0
-		}
-	},
-	"precpu_stats" : {
-		"cpu_usage" : {
-			"percpu_usage" : [8646879, 24350896, 36438778, 30657443],
-			"usage_in_usermode" : 50000000,
-			"total_usage" : 100093996,
-			"usage_in_kernelmode" : 30000000
-		},
-		"system_cpu_usage" : 9492140000000,
-		"throttling_data" : {
-			"periods" : 0,
-			"throttled_periods" : 0,
-			"throttled_time" : 0
-		}
+
+function calculateCPUPercent(statItem, previousCpu, previousSystem) {
+	var cpuDelta = statItem.cpu_stats.cpu_usage.total_usage - statItem.precpu_stats.cpu_usage.total_usage;
+	var systemDelta = statItem.cpu_stats.system_cpu_usage - statItem.precpu_stats.system_cpu_usage;
+	var cpuPercent = 0.0;
+	if (systemDelta > 0.0 && cpuDelta > 0.0) {
+		cpuPercent = (cpuDelta / systemDelta) * statItem.cpu_stats.cpu_usage.percpu_usage.length * 100.0;
 	}
-};
+	return cpuPercent
+}
 
 function sendStats(stats, container) {
-	var name = container.options.metricSession + '.' + container.config.name + '.';
+	var name = container.options.metricSession + '.' + container.options.name + '.' + container.options.index + '.';
 
 	Object.keys(stats.networks).forEach(function(key1) {
 		Object.keys(stats.networks[key1]).forEach(function(key2) {
@@ -159,21 +80,38 @@ function sendStats(stats, container) {
 		});
 	});
 
+	if (container._stats) {
+
+		if (stats.blkio_stats.io_service_bytes_recursive.length && container._stats.blkio_stats.io_service_bytes_recursive.length) {
+			statsD.increment(name + 'io.service_bytes.read', stats.blkio_stats.io_service_bytes_recursive[0].value - container._stats.blkio_stats.io_service_bytes_recursive[0].value);
+			statsD.increment(name + 'io.service_bytes.write', stats.blkio_stats.io_service_bytes_recursive[1].value - container._stats.blkio_stats.io_service_bytes_recursive[1].value);
+		}
+		if (stats.blkio_stats.io_serviced_recursive.length && container._stats.blkio_stats.io_serviced_recursive.length) {
+			statsD.increment(name + 'io.serviced.read', stats.blkio_stats.io_serviced_recursive[0].value - container._stats.blkio_stats.io_serviced_recursive[0].value);
+			statsD.increment(name + 'io.serviced.write', stats.blkio_stats.io_serviced_recursive[1].value - container._stats.blkio_stats.io_serviced_recursive[1].value);
+		}
+	}
 	Object.keys(stats.memory_stats.stats).forEach(function(key2) {
-		statsD.increment(name + 'memory_stats.stats.' + key2, stats.memory_stats.stats[key2]);
+		statsD.gauge(name + 'memory_stats.stats.' + key2, stats.memory_stats.stats[key2]);
 	});
-	statsD.increment(name + 'memory_stats.max_usage', stats.memory_stats.max_usage);
-	statsD.increment(name + 'memory_stats.usage', stats.memory_stats.usage);
-	statsD.increment(name + 'memory_stats.failcnt', stats.memory_stats.failcnt);
-	statsD.increment(name + 'memory_stats.limit', stats.memory_stats.limit);
+	statsD.gauge(name + 'memory_stats.max_usage', stats.memory_stats.max_usage);
+	statsD.gauge(name + 'memory_stats.usage', stats.memory_stats.usage);
+	statsD.gauge(name + 'memory_stats.failcnt', stats.memory_stats.failcnt);
+	statsD.gauge(name + 'memory_stats.limit', stats.memory_stats.limit);
 
 	if (container._stats) {
-		var cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
-		var systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
-		statsD.increment(name + 'cpu.percent', cpuDelta / systemDelta * 100);
+		statsD.gauge(name + 'cpu.percent', calculateCPUPercent(stats, stats.cpu_stats.cpu_usage.total_usage, stats.cpu_stats.system_cpu_usage));
 	}
-
 	container._stats = stats;
+}
+
+function onError(err) {
+	console.log(Object.keys(err))
+	var error = {};
+	Object.keys(err).forEach(function(key) {
+		error[key] = err[key];
+	});
+	return error;
 }
 
 port.once('run', function() {
@@ -184,7 +122,7 @@ port.once('run', function() {
 		}
 
 		var socket = io.connect(program.url, {
-			query : 'token=' + program.token + '&id=' + info.ID
+			query : 'token=' + program.token + '&id=' + program.id
 		});
 
 		socket.on('connect', function() {
@@ -194,8 +132,11 @@ port.once('run', function() {
 			_wait.forEach(function(item) {
 				socket.emit('wait', item[0], item[1]);
 			});
-			console.log({
+
+			var info = {
 				address : program.address,
+				name : program.name,
+				id : program.id,
 				hostname : os.hostname(),
 				type : os.type(),
 				platform : os.platform(),
@@ -205,27 +146,22 @@ port.once('run', function() {
 				freemem : os.freemem(),
 				cpus : os.cpus(),
 				environment : program.environment,
-				region : program.region,
+				zone : program.zone,
 				name : program.name,
+				memory : {
+					used : port.usagedMemory
+				},
+				cores : {
+					count : port.cores,
+					used : port.coresUsed
+				},
 				'multiTenant' : program.multiTenant
-			});
-			socket.emit('init', {
-				address : program.address,
-				hostname : os.hostname(),
-				type : os.type(),
-				platform : os.platform(),
-				arch : os.arch(),
-				release : os.release(),
-				totalmem : os.totalmem(),
-				freemem : os.freemem(),
-				cpus : os.cpus(),
-				environment : program.environment,
-				region : program.region,
-				name : program.name,
-				'multiTenant' : program.multiTenant
-			});
+			};
+
+			console.log(info);
+			socket.emit('init', info);
 		}).on('error', function(error) {
-			throw error;
+			console.log('error', error);
 		});
 
 		socket.on('version', function(cb) {
@@ -233,13 +169,7 @@ port.once('run', function() {
 
 			port.docker.version(function(err, version) {
 				if (err) {
-					return cb({
-						stack : err.stack,
-						arguments : err.arguments,
-						type : err.type,
-						message : err.message,
-						status : err.status
-					});
+					return cb(onError(err));
 				}
 				cb(null, version);
 			});
@@ -250,16 +180,29 @@ port.once('run', function() {
 
 			port.docker.info(function(err, info) {
 				if (err) {
-					return cb({
-						stack : err.stack,
-						arguments : err.arguments,
-						type : err.type,
-						message : err.message,
-						status : err.status
-					});
+					return cb(onError(err));
 				}
 				cb(null, info);
 			});
+		});
+
+		socket.on('resources', function(cb) {
+			debug('Container.resources');
+			var ids = Object.keys(port.containers);
+			cb(null, {
+				memory : {
+					used : port.usagedMemory
+				},
+				cores : {
+					count : port.cores,
+					used : port.coresUsed
+				},
+				containers : {
+					count : ids.length,
+					ids : ids
+				}
+			});
+
 		});
 
 		socket.on('get', function(id, cb) {
@@ -301,14 +244,7 @@ port.once('run', function() {
 			}
 			port.start(data, function(err, container) {
 				if (err) {
-					console.log(err)
-					return cb({
-						stack : err.stack,
-						arguments : err.arguments,
-						type : err.type,
-						message : err.message,
-						status : err.status
-					});
+					return cb(onError(err));
 				}
 				cb(null, container.info);
 			});
@@ -325,21 +261,17 @@ port.once('run', function() {
 			debug('Container.del');
 
 			if (!port.containers[id]) {
-				return cb({
-					error : 'No container found'
-				});
+
+				var err = new Error('No container found');
+				err.code = 'S1';
+
+				return cb(onError(err));
 			}
 			var container = port.containers[id];
 
 			port.stop(id, function(err) {
 				if (err) {
-					return cb({
-						stack : err.stack,
-						arguments : err.arguments,
-						type : err.type,
-						message : err.message,
-						status : err.status
-					});
+					return cb(onError(err));
 				}
 				cb();
 			});
@@ -360,9 +292,9 @@ port.once('run', function() {
 		port.on('stats', sendStats);
 
 		process.on('SIGINT', function() {
+			socket.emit('exit');
 
 			port.destroy(function(data) {
-				socket.emit('exit');
 				setTimeout(function() {
 					process.exit(1);
 				}, 1000);
