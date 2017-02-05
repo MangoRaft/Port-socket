@@ -11,7 +11,7 @@
     "port-socket": "./bin/socket.js"
   },
   "name": "port-socket",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Socket client for Port",
   "repository": {
     "type": "git",
