@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+//#!/usr/bin/env node
 
 var program = require('commander');
 var Port = require('port-docker');
@@ -6,8 +6,8 @@ var path = require('path');
 var fs = require('fs');
 var os = require('os');
 var async = require('async');
-var StatsD = require('node-statsd');
 
+var DStats = require('dstats');
 var Docker = require('dockerode');
 var io = require('socket.io-client');
 var debug = require('debug')('Port-api');
@@ -32,13 +32,6 @@ program.parse(process.argv);
 program.address = program.address || ip.address();
 var wait = [];
 
-if (program.stats) {
-	var statsD = new StatsD({
-		host : program.statsHost,
-		port : program.statsPort
-	});
-}
-
 var port = new Port({
 	name : program.name,
 	address : program.address,
@@ -54,56 +47,6 @@ var port = new Port({
 port.on('error', function(err) {
 	console.log(err);
 });
-
-function calculateCPUPercent(statItem, previousCpu, previousSystem) {
-	var cpuDelta = statItem.cpu_stats.cpu_usage.total_usage - statItem.precpu_stats.cpu_usage.total_usage;
-	var systemDelta = statItem.cpu_stats.system_cpu_usage - statItem.precpu_stats.system_cpu_usage;
-	var cpuPercent = 0.0;
-	if (systemDelta > 0.0 && cpuDelta > 0.0) {
-		cpuPercent = (cpuDelta / systemDelta) * statItem.cpu_stats.cpu_usage.percpu_usage.length * 100.0;
-	}
-	return cpuPercent
-}
-
-function sendStats(stats, container) {
-	var name = container.options.metricSession + '.' + container.options.name + '.' + container.options.index + '.';
-
-	Object.keys(stats.networks).forEach(function(key1) {
-		Object.keys(stats.networks[key1]).forEach(function(key2) {
-			var val = 0;
-			if (!container._stats) {
-				val = stats.networks[key1][key2];
-			} else {
-				val = stats.networks[key1][key2] - container._stats.networks[key1][key2];
-			}
-			statsD.increment(name + 'networks.' + key1 + '.' + key2, val);
-		});
-	});
-
-	if (container._stats) {
-
-		if (stats.blkio_stats.io_service_bytes_recursive.length && container._stats.blkio_stats.io_service_bytes_recursive.length) {
-			statsD.increment(name + 'io.service_bytes.read', stats.blkio_stats.io_service_bytes_recursive[0].value - container._stats.blkio_stats.io_service_bytes_recursive[0].value);
-			statsD.increment(name + 'io.service_bytes.write', stats.blkio_stats.io_service_bytes_recursive[1].value - container._stats.blkio_stats.io_service_bytes_recursive[1].value);
-		}
-		if (stats.blkio_stats.io_serviced_recursive.length && container._stats.blkio_stats.io_serviced_recursive.length) {
-			statsD.increment(name + 'io.serviced.read', stats.blkio_stats.io_serviced_recursive[0].value - container._stats.blkio_stats.io_serviced_recursive[0].value);
-			statsD.increment(name + 'io.serviced.write', stats.blkio_stats.io_serviced_recursive[1].value - container._stats.blkio_stats.io_serviced_recursive[1].value);
-		}
-	}
-	Object.keys(stats.memory_stats.stats).forEach(function(key2) {
-		statsD.gauge(name + 'memory_stats.stats.' + key2, stats.memory_stats.stats[key2]);
-	});
-	statsD.gauge(name + 'memory_stats.max_usage', stats.memory_stats.max_usage);
-	statsD.gauge(name + 'memory_stats.usage', stats.memory_stats.usage);
-	statsD.gauge(name + 'memory_stats.failcnt', stats.memory_stats.failcnt);
-	statsD.gauge(name + 'memory_stats.limit', stats.memory_stats.limit);
-
-	if (container._stats) {
-		statsD.gauge(name + 'cpu.percent', calculateCPUPercent(stats, stats.cpu_stats.cpu_usage.total_usage, stats.cpu_stats.system_cpu_usage));
-	}
-	container._stats = stats;
-}
 
 function onError(err) {
 	console.log(Object.keys(err))
@@ -289,8 +232,18 @@ port.once('run', function() {
 		port.on('state', function(state, container) {
 			socket.emit('state', state, container.info);
 		});
-		port.on('stats', sendStats);
-
+		if (program.stats) {
+			port.on('stats', function sendStats(stats, container) {
+				if (!container._stats) {
+					container._stats = new DStats({
+						host : program.statsHost,
+						port : program.statsPort,
+						key : container.options.metricSession + '.' + container.options.name + '.' + container.options.index
+					});
+				}
+				container._stats.stats(stats);
+			});
+		}
 		process.on('SIGINT', function() {
 			socket.emit('exit');
 
