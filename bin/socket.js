@@ -104,14 +104,8 @@ port.once('run', function () {
                 environment: program.environment,
                 zone: program.zone,
                 name: program.name,
-                memory: {
-                    used: port.usagedMemory
-                },
-                cores: {
-                    count: port.cores,
-                    used: port.coresUsed,
-                    avalibaleCPU: port.avalibaleCPU()
-                },
+                memory: port.avalibale().memory,
+                cores: port.avalibale().cores,
                 'multiTenant': program.multiTenant
             };
 
