@@ -51,7 +51,7 @@ var port = new Port({
     name: program.name,
     address: program.address,
     environment: program.environment,
-    maxMemory: os.totalmem() / Math.pow(1024, 2),
+    maxMemory: os.totalmem(),
     multiTenant: program.multiTenant,
     docker: {
         socket: '/var/run/docker.sock',
