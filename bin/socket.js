@@ -141,14 +141,8 @@ port.once('run', function () {
             debug('Container.resources');
             var ids = Object.keys(port.container());
             cb(null, {
-                memory: {
-                    used: port.usagedMemory
-                },
-                cores: {
-                    count: port.cores,
-                    used: port.coresUsed,
-                    avalibaleCPU: port.avalibaleCPU()
-                },
+                memory: port.avalibale().memory,
+                cores: port.avalibale().cpu,
                 containers: {
                     count: ids.length,
                     ids: ids
