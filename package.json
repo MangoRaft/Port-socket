@@ -11,7 +11,7 @@
     "port-socket": "./bin/socket.js"
   },
   "name": "port-socket",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "description": "Socket client for Port",
   "repository": {
     "type": "git",
@@ -23,8 +23,8 @@
     "debug": "^2.1.2",
     "dockerode": "^2.0.7",
     "ip": "^1.1.4",
-    "port-docker": "^0.1.3",
-    "dstats": "^1.0.0",
+    "port-docker": "https://github.com/MangoRaft/Port.git#es6",
+    "dstats": "https://github.com/MangoRaft/DStats.git",
     "socket.io-client": "^1.3.4"
   }
 }
