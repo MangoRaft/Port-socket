@@ -246,6 +246,9 @@ port.once('run', function () {
                         key: container.options.metricSession + '.' + container.options.name + '.' + container.options.index
                     });
                 }
+
+                stats.cpu_stats.quota = container.resource.quota;
+                stats.cpu_stats.period = container.resource.period;
                 container._stats.stats(stats);
             });
         }
