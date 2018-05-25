@@ -140,7 +140,7 @@ port.once('run', function () {
 
         socket.on('resources', function (cb) {
             debug('Container.resources');
-            var ids = Object.keys(port.container());
+            let ids = Object.keys(port.container());
             cb(null, {
                 memory: port.avalibale().memory,
                 cores: port.avalibale().cores,
@@ -240,6 +240,7 @@ port.once('run', function () {
         });
 
         setInterval(function () {
+            let ids = Object.keys(port.container());
             socket.emit('ping', {
                 memory: port.avalibale().memory,
                 cores: port.avalibale().cores,
