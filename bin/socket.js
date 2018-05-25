@@ -242,7 +242,7 @@ port.once('run', function () {
         setInterval(function () {
             let ids = Object.keys(port.container());
             if (this.connected)
-                socket.emit('ping', {
+                socket.emit('heartbeat', {
                     memory: port.avalibale().memory,
                     cores: port.avalibale().cores,
                     containers: {
