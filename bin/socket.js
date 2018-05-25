@@ -241,15 +241,16 @@ port.once('run', function () {
 
         setInterval(function () {
             let ids = Object.keys(port.container());
-            socket.emit('ping', {
-                memory: port.avalibale().memory,
-                cores: port.avalibale().cores,
-                containers: {
-                    count: ids.length,
-                    ids: ids
-                },
-                uptime: os.uptime()
-            });
+            if (this.connected)
+                socket.emit('ping', {
+                    memory: port.avalibale().memory,
+                    cores: port.avalibale().cores,
+                    containers: {
+                        count: ids.length,
+                        ids: ids
+                    },
+                    uptime: os.uptime()
+                });
         }, 1000);
 
 
@@ -266,7 +267,8 @@ port.once('run', function () {
                 stats.cpu_stats.quota = container.resource.quota;
                 stats.cpu_stats.period = container.resource.period;
                 container._stats.stats(stats);
-                socket.emit('stats', container.id, container._stats.stats(stats));
+                if (this.connected)
+                    socket.emit('stats', container.id, container._stats.stats(stats));
             });
         }
         process.on('SIGINT', async function () {
