@@ -237,6 +237,19 @@ port.once('run', function () {
         port.on('state', function (state, container) {
             socket.emit('state', state, container.info);
         });
+
+        setInterval(function () {
+            socket.emit('ping', {
+                memory: port.avalibale().memory,
+                cores: port.avalibale().cores,
+                containers: {
+                    count: ids.length,
+                    ids: ids
+                }
+            });
+        }, 1000);
+
+
         if (program.stats) {
             port.on('stats', function sendStats(stats, container) {
                 if (!container._stats) {
@@ -250,6 +263,7 @@ port.once('run', function () {
                 stats.cpu_stats.quota = container.resource.quota;
                 stats.cpu_stats.period = container.resource.period;
                 container._stats.stats(stats);
+                socket.volatile.emit('stats', container.id, container._stats.stats(stats));
             });
         }
         process.on('SIGINT', async function () {
