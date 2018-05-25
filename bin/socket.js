@@ -241,7 +241,7 @@ port.once('run', function () {
 
         setInterval(function () {
             let ids = Object.keys(port.container());
-            if (this.connected)
+            if (socket.connected)
                 socket.emit('heartbeat', {
                     memory: port.avalibale().memory,
                     cores: port.avalibale().cores,
@@ -267,7 +267,7 @@ port.once('run', function () {
                 stats.cpu_stats.quota = container.resource.quota;
                 stats.cpu_stats.period = container.resource.period;
                 container._stats.stats(stats);
-                if (this.connected)
+                if (socket.connected)
                     socket.emit('stats', container.id, container._stats.stats(stats));
             });
         }
