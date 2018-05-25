@@ -266,7 +266,7 @@ port.once('run', function () {
                 stats.cpu_stats.quota = container.resource.quota;
                 stats.cpu_stats.period = container.resource.period;
                 container._stats.stats(stats);
-                socket.volatile.emit('stats', container.id, container._stats.stats(stats));
+                socket.emit('stats', container.id, container._stats.stats(stats));
             });
         }
         process.on('SIGINT', async function () {
