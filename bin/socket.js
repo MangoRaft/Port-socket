@@ -37,11 +37,12 @@ program.option('-z, --zone [REGION]', 'Zone located in', 'far1');
 program.option('-t, --token [TOKEN]', 'Token auth');
 program.option('-e, --environment [ENVIROMENT]', 'environment to use', 'services');
 program.option('-n, --name [NAME]', 'name to use', 'test');
-program.option('-i, --id [ID]', 'id to use', 'test');
+program.option('-i, --id [ID]', 'id to use', os.hostname());
 program.option('-m, --multi-tenant [MULTITENANT]', 'multiTenant', true);
 program.option('-s, --stats [STATS]', false);
 program.option('-a, --address [ADDRESS]', ip.address());
 program.option('-b, --stats-host [HOST]', '127.0.0.1');
+program.option('-c, --stats-port [PORT]', 8125);
 program.option('-c, --stats-port [PORT]', 8125);
 program.parse(process.argv);
 program.address = program.address || ip.address();
@@ -245,7 +246,8 @@ port.once('run', function () {
                 containers: {
                     count: ids.length,
                     ids: ids
-                }
+                },
+                uptime: os.uptime()
             });
         }, 1000);
 
