@@ -33,17 +33,14 @@ program.version(require('../package.json').version);
 program.description('View logs in teal-time.');
 
 program.option('-u, --url [HOST]', 'HOST', 'http://127.0.0.1:8000');
-program.option('-z, --zone [REGION]', 'Zone located in', 'far1');
+program.option('-z, --zone [REGION]', 'Zone located in', 'par1');
 program.option('-t, --token [TOKEN]', 'Token auth');
 program.option('-e, --environment [ENVIROMENT]', 'environment to use', 'services');
 program.option('-n, --name [NAME]', 'name to use', 'test');
 program.option('-i, --id [ID]', 'id to use', os.hostname());
 program.option('-m, --multi-tenant [MULTITENANT]', 'multiTenant', true);
-program.option('-s, --stats [STATS]', false);
 program.option('-a, --address [ADDRESS]', ip.address());
-program.option('-b, --stats-host [HOST]', '127.0.0.1');
-program.option('-c, --stats-port [PORT]', 8125);
-program.option('-c, --stats-port [PORT]', 8125);
+
 program.parse(process.argv);
 program.address = program.address || ip.address();
 var wait = [];
@@ -254,23 +251,11 @@ port.once('run', function () {
         }, 1000);
 
 
-        if (program.stats) {
-            port.on('stats', function sendStats(stats, container) {
-                if (!container._stats) {
-                    container._stats = new DStats({
-                        host: program.statsHost,
-                        port: program.statsPort,
-                        key: container.options.metricSession + '.' + container.options.name + '.' + container.options.index
-                    });
-                }
+        port.on('stats', function sendStats(stats, container) {
+            if (socket.connected)
+                socket.emit('stats', container.id, stats);
+        });
 
-                stats.cpu_stats.quota = container.resource.quota;
-                stats.cpu_stats.period = container.resource.period;
-                container._stats.stats(stats);
-                if (socket.connected)
-                    socket.emit('stats', container.id, container._stats.stats(stats));
-            });
-        }
         process.on('SIGINT', async function () {
             socket.emit('exit');
             await port.destroy();
